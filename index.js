@@ -76,14 +76,20 @@ server.listen(8000, "127.0.0.1", () => {
 */
 
 ///////////////////////////////////
+// NODE FARM
+// core modules
+const http = require('http');
+const fs = require('fs');
+const url = require('url');
+// third party modules
+const slugify = require('slugify');
 
-const http = require("http");
-const fs = require("fs");
-const url = require("url");
-
+// own modules
+const replaceTemplate = require('./modules/replaceTemplate');
+const findProductById = require('./modules/findProductById');
 // get data
 
-const fileContent = fs.readFileSync(`${__dirname}/dev-data/data.json`, "utf-8");
+const fileContent = fs.readFileSync(`${__dirname}/dev-data/data.json`, 'utf-8');
 const fileContentObject = JSON.parse(fileContent);
 // console.log(fileContentObject);
 /* test
@@ -96,132 +102,71 @@ fileContentObject.map((obj) => {
 // console.log(fileContentObject);
 // replace template
 
-function replaceTemplate(object, template) {
-  // console.log("object.......", object);
-  // console.log("template....", template);
-  // console.log(object.image, object.productName);
-  let replaceTemplateWithObjectData = template.replace(
-    /\{%IMAGE%\}/g,
-    object.image
-  ); //g flag for all lines
-  replaceTemplateWithObjectData = replaceTemplateWithObjectData.replace(
-    /\{%PRODUCT_NAME%\}/g,
-    object.productName
-  );
-  replaceTemplateWithObjectData = replaceTemplateWithObjectData.replace(
-    /\{%ID%\}/g,
-    object.id
-  );
-
-  replaceTemplateWithObjectData = replaceTemplateWithObjectData.replace(
-    /\{%QUANTITY%\}/g,
-    object.quantity
-  );
-
-  replaceTemplateWithObjectData = replaceTemplateWithObjectData.replace(
-    /\{%PRICE%\}/g,
-    object.price
-  );
-  replaceTemplateWithObjectData = replaceTemplateWithObjectData.replace(
-    /\{%NUTRIENTS%\}/g,
-    object.nutrients
-  );
-  replaceTemplateWithObjectData = replaceTemplateWithObjectData.replace(
-    /\{%FROM%\}/g,
-    object.from
-  );
-  replaceTemplateWithObjectData = replaceTemplateWithObjectData.replace(
-    /\{%DESCRIPTION%\}/g,
-    object.description
-  );
-  // if the product is not organic replace the class to 'not-organic'
-  if (!object.organic)
-    replaceTemplateWithObjectData = replaceTemplateWithObjectData.replace(
-      /\{%NOT_ORGANIC%\}/gm,
-      "not-organic"
-    );
-  // console.log(replaceTemplateWithObjectData);
-
-  return replaceTemplateWithObjectData;
-}
-
 // Get templates
 
-const templateOverview = fs.readFileSync(
-  `${__dirname}/templates/template-overview.html`,
-  "utf-8"
-);
-const templateCard = fs.readFileSync(
-  `${__dirname}/templates/template-card.html`,
-  "utf-8"
-);
-const templateProduct = fs.readFileSync(
-  `${__dirname}/templates/template-product.html`,
-  "utf-8"
-);
+const templateOverview = fs.readFileSync(`${__dirname}/templates/template-overview.html`, 'utf-8');
+const templateCard = fs.readFileSync(`${__dirname}/templates/template-card.html`, 'utf-8');
+const templateProduct = fs.readFileSync(`${__dirname}/templates/template-product.html`, 'utf-8');
 
-function findProductById(objectsArray, targetId) {
-  // console.log(objectsArray, targetId);
-  const product = objectsArray.filter((object) => {
-    return object.id === targetId;
-  });
-  // console.log(product);
-  return product;
-}
+// slugify test
+// console.log(slugify("Fresh Avacado",{
+//   replacement: 'A',
+//   remove : /a/g,
+//   lower:true
+// }))
 
-// server
+const slugs = fileContentObject.map((object) => slugify(object.productName, { lower: true }));
+console.log(slugs);
+// making server
 const server = http.createServer((req, res) => {
   const pathName = req.url;
   // console.log(req.url);
   // console.log(url.parse(req.url, true));
+  // product page
   const urlParseObject = url.parse(req.url, true);
-  if (urlParseObject.pathname === "/product") {
+
+  if (urlParseObject.pathname === '/product') {
     // all product ids are of type Number
     const productId = +urlParseObject.query.id;
     // console.log(productId)
     const targetProductData = findProductById(fileContentObject, productId);
     // return type is array
     // console.log(targetProductData);
-    const targetProductHtml = replaceTemplate(
-      ...targetProductData,
-      templateProduct
-    );
+    const targetProductHtml = replaceTemplate(...targetProductData, templateProduct);
     // console.log(urlParseObject);
+    res.writeHead(200, {
+      'Content-type': 'text/html',
+    });
     res.end(targetProductHtml);
   }
   // Overview
-  else if (pathName === "/" || pathName === "/overview") {
+  else if (pathName === '/' || pathName === '/overview') {
     res.writeHead(200, {
-      "Content-type": "text/html",
+      'Content-type': 'text/html',
     });
     // replaced card data
-    let replacedTemplateWithObjectDataArray = fileContentObject.map((object) =>
-      replaceTemplate(object, templateCard)
-    );
+    let replacedTemplateWithObjectDataArray = fileContentObject.map((object) => replaceTemplate(object, templateCard));
 
     // console.log(typeof replacedTemplateWithObjectDataArray);
     // console.log(replacedTemplateWithObjectDataArray) //array
     // replaced overview with cards
-    const output = templateOverview.replace(
-      /\{%PRODUCT_CARDS%\}/g,
-      replacedTemplateWithObjectDataArray.join("")
-    );
+    const output = templateOverview.replace(/\{%PRODUCT_CARDS%\}/g, replacedTemplateWithObjectDataArray.join(''));
     res.end(output); // accepts only string
     // res.end("This is overview page.....");
   }
-  // product page
-  else if (pathName === "/product") {
-  }
+
   // Api
-  else if (pathName === "/api") {
+  else if (pathName === '/api') {
+    res.end('APIIIIIIIIIII');
   }
   // Not found
   else {
-    res.writeHead(404, { "Content-type": "text/html" });
-    res.end("<h1>PAGE 404 NOT FOUND </h1>");
+    res.writeHead(404, { 'Content-type': 'text/html' });
+    res.end('<h1>PAGE 404 NOT FOUND </h1>');
   }
 });
 
-server.listen(8000, "127.0.0.1", () => {
-  console.log("started server.....");
+server.listen(8000, '127.0.0.1', () => {
+  console.log('started server.....');
 });
+//major.minor.patch versioning - ^ accept major, ~ accept patch only , * accept all version
